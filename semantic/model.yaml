@@ -1,0 +1,1915 @@
+business_summary: Cadena mexicana que opera restaurantes y tiendas de autoservicio, con 12 locales en varias ciudades
+  y regiones. El DW captura las ventas a nivel de línea de ticket (FCT_VTA, con más de 1.9 millones de filas entre
+  2025 y noviembre de 2026), las devoluciones de producto con su motivo (FCT_DEV) y la foto semanal de existencias
+  y costos unitarios por tienda y producto (FCT_INV). Alrededor de estos hechos están los catálogos de clientes,
+  empleados, productos, líneas, tiendas, regiones, motivos de devolución y el calendario.
+tables:
+- name: AUD_BITACORA
+  role: audit
+  business_name: Bitácora de auditoría de cambios en el data warehouse
+  description: Registro histórico de operaciones de inserción, actualización y borrado realizadas sobre tablas del
+    data warehouse de la cadena (restaurantes y tiendas de autoservicio). Cada fila documenta quién hizo el cambio,
+    en qué tabla, qué tipo de operación fue y cuándo ocurrió. Se usa para trazabilidad y control; no contiene los
+    valores anteriores ni nuevos del registro modificado (supuesto). Las tablas auditadas que aparecen son DIM_PROD,
+    FCT_VTA y FCT_DEV. El volumen actual es de unas 500 filas.
+  grain: ''
+  row_count: 500
+  primary_key: []
+  columns:
+  - name: BIT_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de la bitácora
+    description: Número consecutivo que identifica cada evento de auditoría. Es único en las 500 filas, por lo que
+      funciona como llave natural aunque la tabla no tenga PK declarada (supuesto).
+    role: key
+    synonyms:
+    - folio de bitácora
+    - id de auditoría
+    - consecutivo de bitácora
+    values: {}
+    samples: []
+    num_distinct: 500
+  - name: USR_CVE
+    data_type: VARCHAR2
+    business_name: Usuario que ejecutó el cambio
+    description: 'Clave del usuario o proceso que realizó la operación. Hay tres valores: JPEREZ (persona), ETL_USR
+      (cuenta de carga automática de datos) y ADMIN (cuenta administrativa). La descripción de cada usuario se infiere
+      del nombre (supuesto).'
+    role: attribute
+    synonyms:
+    - usuario
+    - clave de usuario
+    - quién hizo el cambio
+    - responsable
+    values:
+      JPEREZ: Usuario individual (persona, supuesto)
+      ETL_USR: Cuenta de proceso ETL de carga de datos (supuesto)
+      ADMIN: Cuenta administrativa (supuesto)
+    samples:
+    - JPEREZ
+    - ETL_USR
+    - ADMIN
+    num_distinct: 3
+  - name: TBL_NOM
+    data_type: VARCHAR2
+    business_name: Tabla afectada
+    description: Nombre de la tabla del data warehouse sobre la que se hizo el cambio. Las convenciones de prefijo
+      sugieren DIM_ para dimensiones y FCT_ para tablas de hechos.
+    role: code
+    synonyms:
+    - tabla
+    - nombre de tabla
+    - tabla modificada
+    - objeto afectado
+    values:
+      DIM_PROD: Dimensión de productos (supuesto)
+      FCT_VTA: Hechos de ventas (supuesto)
+      FCT_DEV: Hechos de devoluciones (supuesto)
+    samples:
+    - FCT_VTA
+    - DIM_PROD
+    - FCT_DEV
+    num_distinct: 3
+  - name: ACC_CVE
+    data_type: VARCHAR2
+    business_name: Tipo de operación
+    description: 'Código de la acción realizada sobre el registro: alta, modificación o baja.'
+    role: code
+    synonyms:
+    - acción
+    - operación
+    - tipo de cambio
+    - evento
+    values:
+      INS: Inserción (alta de registro)
+      UPD: Actualización (modificación de registro)
+      DEL: Borrado (baja de registro)
+    samples:
+    - INS
+    - UPD
+    - DEL
+    num_distinct: 3
+  - name: TS_REG
+    data_type: TIMESTAMP
+    business_name: Fecha y hora del registro
+    description: Fecha y hora exactas en que se registró el evento de auditoría. El rango observado va del 1 de
+      enero al 27 de octubre de 2026.
+    role: date
+    synonyms:
+    - fecha de cambio
+    - fecha de auditoría
+    - timestamp
+    - momento del evento
+    - fecha de registro
+    values: {}
+    samples: []
+    num_distinct: 500
+  use_in_answers: false
+- name: DIM_CTE
+  role: dimension
+  business_name: Dimensión de clientes
+  description: 'Catálogo de clientes de la cadena (restaurantes y tiendas de autoservicio). Cada fila es una persona
+    o cuenta cliente con su nombre y su segmento. Es referenciada por FCT_VTA.CTE_ID, por lo que sirve para analizar
+    ventas por cliente o segmento. Incluye un registro genérico ''PUBLICO EN GENERAL'' (supuesto: representa ventas
+    sin cliente identificado). Los códigos de segmento se interpretan a partir de sus valores y no están documentados
+    en el esquema (supuesto).'
+  grain: ''
+  row_count: 2001
+  primary_key:
+  - CTE_ID
+  columns:
+  - name: CTE_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de cliente
+    description: Clave primaria numérica del cliente. Va de 0 a 2000 sin huecos (2001 valores distintos). Es la
+      llave que usa FCT_VTA para ligar cada venta con su cliente.
+    role: key
+    synonyms:
+    - ID cliente
+    - clave cliente
+    - no. cliente
+    values: {}
+    samples: []
+    num_distinct: 2001
+  - name: CTE_NOM
+    data_type: VARCHAR2
+    business_name: Nombre del cliente
+    description: 'Nombre completo del cliente (nombre y apellidos). Incluye el registro genérico ''PUBLICO EN GENERAL''
+      (supuesto: cliente no identificado).'
+    role: attribute
+    synonyms:
+    - cliente
+    - nombre cliente
+    - comprador
+    - consumidor
+    - nombre
+    values: {}
+    samples:
+    - PUBLICO EN GENERAL
+    - CLAUDIA LÓPEZ RAMÍREZ
+    - LUIS PÉREZ TORRES
+    - PATRICIA MEDINA MARTÍNEZ
+    - RAÚL LÓPEZ DÍAZ
+    - EDUARDO REYES HERRERA
+    - DIANA HERRERA GONZÁLEZ
+    - ADRIANA MORALES CASTILLO
+    num_distinct: 2001
+  - name: SEG_CVE
+    data_type: VARCHAR2
+    business_name: Segmento del cliente
+    description: 'Código de segmento al que pertenece el cliente. Tiene 3 valores: GEN (el más frecuente, 1190 clientes),
+      FRE (615) y EMP (196). La decodificación es supuesta, a confirmar con el negocio.'
+    role: code
+    synonyms:
+    - segmento
+    - tipo de cliente
+    - clasificación cliente
+    - cve segmento
+    values:
+      GEN: General / público general (supuesto)
+      FRE: Frecuente (supuesto)
+      EMP: Empresa o corporativo (supuesto)
+    samples:
+    - GEN
+    - FRE
+    - EMP
+    num_distinct: 3
+  use_in_answers: true
+- name: DIM_EMP
+  role: dimension
+  business_name: Catálogo de empleados
+  description: Catálogo de empleados de la cadena (aproximadamente 78 registros). Cada fila es una persona con su
+    nombre completo, la tienda o sucursal a la que está asignada y su puesto. Es referenciada por las tablas de
+    hechos de ventas (FCT_VTA) y devoluciones (FCT_DEV) para saber qué empleado participó en cada transacción. El
+    código de puesto PTO_CVE sugiere que los puestos son cajero, mesero y gerente (supuesto).
+  grain: ''
+  row_count: 78
+  primary_key:
+  - EMP_ID
+  columns:
+  - name: EMP_ID
+    data_type: NUMBER(38,0)
+    business_name: Clave del empleado
+    description: Identificador numérico único del empleado. Es la clave primaria de la tabla y el valor que usan
+      las tablas de hechos para referenciar al empleado.
+    role: key
+    synonyms:
+    - ID empleado
+    - clave empleado
+    - número de empleado
+    - no. empleado
+    values: {}
+    samples: []
+    num_distinct: 78
+  - name: EMP_NOM
+    data_type: VARCHAR2
+    business_name: Nombre del empleado
+    description: Nombre completo del empleado (nombre de pila y apellidos). No se repite entre filas en los datos
+      observados.
+    role: attribute
+    synonyms:
+    - nombre empleado
+    - nombre completo
+    - colaborador
+    - trabajador
+    - personal
+    values: {}
+    samples:
+    - Adriana Martínez Morales
+    - José Jiménez Medina
+    - María Gómez Castro
+    - Fernando Martínez Vázquez
+    - Héctor Gutiérrez Ramírez
+    - Diana Reyes Ramírez
+    - Diana Medina Vázquez
+    - Ana Torres Jiménez
+    num_distinct: 78
+  - name: TDA_ID
+    data_type: NUMBER(38,0)
+    business_name: Tienda o sucursal asignada
+    description: Identificador de la tienda o sucursal (restaurante o tienda de autoservicio) donde trabaja el empleado.
+      Es clave foránea hacia DIM_TDA.
+    role: foreign_key
+    synonyms:
+    - ID tienda
+    - ID sucursal
+    - clave tienda
+    - sucursal
+    - restaurante
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '5'
+    - '4'
+    - '11'
+    - '3'
+    - '6'
+    - '8'
+    num_distinct: 12
+  - name: PTO_CVE
+    data_type: VARCHAR2
+    business_name: Clave de puesto
+    description: Código que indica el puesto del empleado. Los tres valores observados son CAJ, MES y GTE. La interpretación
+      de cada código es una suposición a partir de las abreviaturas y de los tipos de negocio de la cadena (supuesto).
+    role: code
+    synonyms:
+    - puesto
+    - clave puesto
+    - cargo
+    - rol del empleado
+    - tipo de puesto
+    values:
+      CAJ: Cajero (supuesto)
+      MES: Mesero (supuesto)
+      GTE: Gerente (supuesto)
+    samples:
+    - CAJ
+    - MES
+    - GTE
+    num_distinct: 3
+  use_in_answers: true
+- name: DIM_FEC
+  role: dimension
+  business_name: Calendario (dimensión de fechas)
+  description: 'Catálogo de días calendario que permite analizar ventas, devoluciones e inventario por año, mes,
+    semana, día de la semana y festivo. Cubre del 2025-01-01 al 2026-11-11 (680 días, sin huecos ni nulos). La clave
+    FEC_ID tiene formato AAAAMMDD. Es referenciada por FCT_VTA, FCT_DEV y FCT_INV, por lo que se asume que estas
+    tablas son de ventas, devoluciones e inventario (supuesto). Preguntas abiertas: (1) ¿El calendario se extenderá
+    más allá de noviembre de 2026? (2) ¿FES_FLG marca festivos nacionales mexicanos o también días de promoción
+    de la cadena? (supuesto: festivos oficiales).'
+  grain: Un día calendario (una fila por fecha).
+  row_count: 680
+  primary_key:
+  - FEC_ID
+  columns:
+  - name: FEC_ID
+    data_type: NUMBER(38,0)
+    business_name: Clave de fecha
+    description: Clave primaria de la dimensión en formato numérico AAAAMMDD (ej. 20250101). Es la llave que usan
+      las tablas de hechos para unirse con el calendario.
+    role: key
+    synonyms:
+    - id de fecha
+    - clave de día
+    - llave de fecha
+    values: {}
+    samples: []
+    num_distinct: 680
+  - name: FEC
+    data_type: DATE
+    business_name: Fecha
+    description: Fecha calendario en tipo DATE. Es el valor legible de la clave FEC_ID.
+    role: date
+    synonyms:
+    - día
+    - fecha calendario
+    values: {}
+    samples: []
+    num_distinct: 680
+  - name: ANIO
+    data_type: NUMBER(38,0)
+    business_name: Año
+    description: Año calendario de la fecha. En los datos aparecen 2025 y 2026.
+    role: time
+    synonyms:
+    - año
+    - ejercicio
+    values: {}
+    samples:
+    - '2025'
+    - '2026'
+    num_distinct: 2
+  - name: MES
+    data_type: NUMBER(38,0)
+    business_name: Número de mes
+    description: Número del mes del año, de 1 (enero) a 12 (diciembre).
+    role: time
+    synonyms:
+    - mes
+    - número de mes
+    values: {}
+    samples:
+    - '7'
+    - '1'
+    - '10'
+    - '8'
+    - '5'
+    - '3'
+    - '6'
+    - '9'
+    num_distinct: 12
+  - name: NOM_MES
+    data_type: VARCHAR2
+    business_name: Nombre del mes
+    description: Nombre del mes en español, para reportes y gráficas.
+    role: attribute
+    synonyms:
+    - mes en letra
+    - nombre del mes
+    values: {}
+    samples:
+    - Julio
+    - Agosto
+    - Mayo
+    - Marzo
+    - Enero
+    - Octubre
+    - Septiembre
+    - Junio
+    num_distinct: 12
+  - name: DIA_SEM
+    data_type: NUMBER(38,0)
+    business_name: Número de día de la semana
+    description: Número del día de la semana, de 1 a 7. Se asume que 1 es domingo y 7 es sábado (supuesto, según
+      el orden típico de Oracle TO_CHAR con 'D').
+    role: time
+    synonyms:
+    - día de semana
+    - número de día
+    values:
+      '1': Domingo (supuesto)
+      '2': Lunes (supuesto)
+      '3': Martes (supuesto)
+      '4': Miércoles (supuesto)
+      '5': Jueves (supuesto)
+      '6': Viernes (supuesto)
+      '7': Sábado (supuesto)
+    samples:
+    - '3'
+    - '1'
+    - '6'
+    - '2'
+    - '4'
+    - '5'
+    - '7'
+    num_distinct: 7
+  - name: NOM_DIA
+    data_type: VARCHAR2
+    business_name: Nombre del día de la semana
+    description: Nombre del día de la semana en español (ej. Lunes, Sábado).
+    role: attribute
+    synonyms:
+    - nombre del día
+    - día de la semana
+    values: {}
+    samples:
+    - Miércoles
+    - Jueves
+    - Domingo
+    - Martes
+    - Viernes
+    - Lunes
+    - Sábado
+    num_distinct: 7
+  - name: SEM_ANIO
+    data_type: NUMBER(38,0)
+    business_name: Semana del año
+    description: Número de semana dentro del año, de 1 a 52. Se desconoce si sigue la norma ISO (que puede llegar
+      a 53) o una numeración propia (supuesto).
+    role: time
+    synonyms:
+    - semana
+    - número de semana
+    values: {}
+    samples: []
+    num_distinct: 52
+  - name: FES_FLG
+    data_type: VARCHAR2
+    business_name: Es día festivo
+    description: Indicador de día festivo. S = festivo (12 días en el rango); N = día normal (668 días). Se asume
+      que son festivos oficiales de México (supuesto).
+    role: flag
+    synonyms:
+    - festivo
+    - día feriado
+    - día de asueto
+    values:
+      S: 'Día festivo (supuesto: festivo oficial)'
+      N: Día normal
+    samples:
+    - N
+    - S
+    num_distinct: 2
+  use_in_answers: true
+- name: DIM_LIN
+  role: lookup
+  business_name: Catálogo de líneas de producto
+  description: Catálogo pequeño de líneas de producto (categorías) que se usa para clasificar los productos de la
+    cadena. Tiene 9 líneas, cada una con un identificador, una descripción y un tipo de código. Es referenciado
+    por DIM_PROD mediante LIN_ID. Por las descripciones (Platos fuertes, Entradas, Postres, Abarrotes, Lácteos,
+    Limpieza), parece agrupar productos de restaurantes y de tiendas de autoservicio (supuesto). El significado
+    exacto de LIN_TP no está documentado; la decodificación propuesta es supuesta.
+  grain: ''
+  row_count: 9
+  primary_key:
+  - LIN_ID
+  columns:
+  - name: LIN_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de línea
+    description: Clave primaria del catálogo de líneas. Valores del 1 al 9, uno por línea. Es la llave que usa DIM_PROD
+      para indicar a qué línea pertenece cada producto.
+    role: key
+    synonyms:
+    - id de línea
+    - código de línea
+    - id de categoría
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    num_distinct: 9
+  - name: LIN_DESC
+    data_type: VARCHAR2
+    business_name: Descripción de la línea
+    description: 'Nombre de la línea de producto, tal como lo usa el negocio. Valores observados: Abarrotes, Lácteos,
+      Panadería, Carnes frías, Bebidas, Platos fuertes, Limpieza, Entradas, Postres.'
+    role: attribute
+    synonyms:
+    - línea
+    - categoría
+    - departamento
+    - familia de producto
+    - nombre de línea
+    values: {}
+    samples:
+    - Lácteos
+    - Panadería
+    - Carnes frías
+    - Bebidas
+    - Platos fuertes
+    - Abarrotes
+    - Limpieza
+    - Entradas
+    num_distinct: 9
+  - name: LIN_TP
+    data_type: VARCHAR2
+    business_name: Tipo de línea
+    description: 'Código que clasifica la línea según el tipo de venta o de unidad de negocio (supuesto). Tiene
+      3 valores distintos: T aparece en 5 líneas, R en 3 y A en 1. Por los nombres, las líneas de restaurante (Entradas,
+      Platos fuertes, Postres) corresponderían a R y las de tienda (Abarrotes, Lácteos, Panadería, Carnes frías,
+      Bebidas, Limpieza) a T; sin embargo, son 6 candidatas para T y solo hay 5, por lo que una de ellas, con la
+      A, es ambigua. Confirmar con el equipo de datos.'
+    role: code
+    synonyms:
+    - tipo de línea
+    - tipo de categoría
+    - clasificación de línea
+    values:
+      T: Tienda de autoservicio (supuesto)
+      R: Restaurante (supuesto)
+      A: Ambos o general (supuesto); no es posible identificar con certeza qué línea tiene este código
+    samples:
+    - T
+    - R
+    - A
+    num_distinct: 3
+  use_in_answers: true
+- name: DIM_MTV
+  role: lookup
+  business_name: Catálogo de motivos de devolución (supuesto)
+  description: 'Catálogo pequeño que relaciona un código corto de motivo con su descripción en español. Según su
+    comentario original (''Catalogo motivos'') y la tabla que la referencia (FCT_DEV, que por su nombre probablemente
+    registra devoluciones), sirve para explicar por qué se devolvió un producto (supuesto). Contiene 5 filas. Los
+    valores de ejemplo (producto caducado, producto dañado, error de cobro, insatisfacción del cliente, otro) encajan
+    con una cadena de restaurantes y tiendas de autoservicio. Pregunta abierta: confirmar si FCT_DEV es realmente
+    de devoluciones y si los motivos aplican también a otros eventos.'
+  grain: ''
+  row_count: 5
+  primary_key:
+  - MTV_CVE
+  columns:
+  - name: MTV_CVE
+    data_type: VARCHAR2
+    business_name: Clave del motivo
+    description: Código corto de 3 letras que identifica cada motivo. Es la clave primaria y la columna que referencia
+      FCT_DEV.MTV_CVE. Las abreviaturas parecen derivarse de la descripción (supuesto).
+    role: key
+    synonyms:
+    - código de motivo
+    - cve motivo
+    - clave motivo
+    values:
+      CAD: Producto caducado
+      DAN: Producto dañado
+      ERR: Error de cobro
+      INS: Insatisfacción del cliente
+      OTR: Otro
+    samples:
+    - OTR
+    - ERR
+    - INS
+    - CAD
+    - DAN
+    num_distinct: 5
+  - name: MTV_DESC
+    data_type: VARCHAR2
+    business_name: Descripción del motivo
+    description: Nombre en texto legible del motivo, para mostrar en reportes. Cada valor es único en la tabla.
+    role: attribute
+    synonyms:
+    - motivo
+    - razón
+    - causa
+    - descripción del motivo
+    - motivo de devolución
+    values: {}
+    samples:
+    - Error de cobro
+    - Insatisfacción del cliente
+    - Otro
+    - Producto caducado
+    - Producto dañado
+    num_distinct: 5
+  use_in_answers: true
+- name: DIM_PROD
+  role: dimension
+  business_name: Dimensión de productos
+  description: Catálogo de productos que la cadena vende o usa, con descripción, línea a la que pertenece y precio
+    de lista. Cubre tanto platillos de restaurante (guacamole, ceviche, sopes) como artículos de tienda de autoservicio
+    (aceite vegetal, yogur). Tiene 71 productos, identificados por PRD_ID, y es referenciada por los hechos de devoluciones,
+    inventario y ventas. (supuesto) El precio de lista es el precio de referencia del catálogo y no necesariamente
+    el precio cobrado en cada venta.
+  grain: ''
+  row_count: 71
+  primary_key:
+  - PRD_ID
+  columns:
+  - name: PRD_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de producto
+    description: Clave primaria del producto. Valores de 1001 a 1071, sin nulos y sin repetidos. Es la llave que
+      usan FCT_VTA, FCT_INV y FCT_DEV.
+    role: key
+    synonyms:
+    - id producto
+    - código de producto
+    - clave producto
+    - SKU
+    values: {}
+    samples: []
+    num_distinct: 71
+  - name: PRD_DESC
+    data_type: VARCHAR2
+    business_name: Nombre del producto
+    description: Descripción o nombre comercial del producto, tal como se muestra al usuario de negocio. Sin nulos
+      y sin repetidos. Mezcla platillos preparados y artículos de abarrotes.
+    role: attribute
+    synonyms:
+    - descripción producto
+    - nombre producto
+    - producto
+    - artículo
+    - platillo
+    values: {}
+    samples:
+    - Guacamole
+    - Sopa de tortilla
+    - Queso fundido
+    - Tostadas de atún
+    - Ensalada César
+    - Esquites
+    - Sopes de chorizo
+    - Ceviche de pescado
+    num_distinct: 71
+  - name: LIN_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de línea de producto
+    description: 'Llave foránea hacia DIM_LIN. Agrupa cada producto en una línea o categoría de negocio (supuesto:
+      p. ej. alimentos preparados, abarrotes, lácteos). Hay 9 líneas distintas, con mayor presencia de las líneas
+      8 y 2 (12 productos cada una).'
+    role: foreign_key
+    synonyms:
+    - línea
+    - categoría
+    - familia
+    - grupo de producto
+    - id línea
+    values: {}
+    samples:
+    - '8'
+    - '2'
+    - '1'
+    - '4'
+    - '5'
+    - '9'
+    - '3'
+    - '6'
+    num_distinct: 9
+  - name: PRC_LST
+    data_type: NUMBER(12,2)
+    business_name: Precio de lista
+    description: 'Precio de lista del producto en moneda local (supuesto: pesos mexicanos), con dos decimales. Va
+      de 18.70 a 401.33. No es un valor agregable: sumarlo no tiene sentido de negocio, así que se usa para análisis
+      de precios por producto o línea.'
+    role: attribute
+    synonyms:
+    - precio
+    - precio lista
+    - precio de venta sugerido
+    - tarifa
+    values: {}
+    samples: []
+    num_distinct: 71
+  - name: UOM_CVE
+    data_type: VARCHAR2
+    business_name: Unidad de medida
+    description: Código de la unidad de medida en que se vende o cuenta el producto. Todos los registros tienen
+      el mismo valor (PZA), por lo que en la práctica todo el catálogo se cuenta por pieza.
+    role: code
+    synonyms:
+    - unidad de medida
+    - UM
+    - unidad
+    - clave unidad
+    values:
+      PZA: Pieza
+    samples:
+    - PZA
+    num_distinct: 1
+  use_in_answers: true
+- name: DIM_RGN
+  role: lookup
+  business_name: Catálogo de regiones
+  description: Catálogo pequeño de regiones geográficas en las que opera la cadena. Hay cuatro regiones (Centro,
+    Bajío, Norte y Occidente). Cada tienda de DIM_TDA apunta a una región mediante RGN_ID. (supuesto) Las regiones
+    son agrupaciones operativas internas de la empresa, no necesariamente las regiones oficiales de México.
+  grain: ''
+  row_count: 4
+  primary_key:
+  - RGN_ID
+  columns:
+  - name: RGN_ID
+    data_type: NUMBER(38,0)
+    business_name: Id de región
+    description: Identificador numérico único de la región. Es la clave primaria y la que usa DIM_TDA.RGN_ID para
+      indicar la región de cada tienda. (supuesto) La evidencia no muestra qué ID corresponde a cada nombre, así
+      que no se decodifica.
+    role: key
+    synonyms:
+    - código de región
+    - id de zona
+    - clave región
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    num_distinct: 4
+  - name: RGN_DESC
+    data_type: VARCHAR2
+    business_name: Nombre de la región
+    description: 'Nombre de la región con el que la gente de negocio la identifica y reporta: Centro, Bajío, Norte
+      u Occidente.'
+    role: attribute
+    synonyms:
+    - región
+    - zona
+    - nombre de región
+    values: {}
+    samples:
+    - Centro
+    - Bajío
+    - Norte
+    - Occidente
+    num_distinct: 4
+  use_in_answers: true
+- name: DIM_TDA
+  role: dimension
+  business_name: Tiendas y restaurantes (sucursales)
+  description: 'Catálogo maestro de los locales de la cadena: restaurantes y tiendas de autoservicio. Cada fila
+    es un local con su nombre, tipo, ciudad, región, fecha de apertura y superficie. Es la dimensión de ubicación
+    a la que se conectan empleados, devoluciones, inventario y ventas.'
+  grain: ''
+  row_count: 12
+  primary_key:
+  - TDA_ID
+  columns:
+  - name: TDA_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de tienda/restaurante
+    description: Clave primaria del local. Es el identificador que usan las demás tablas para indicar en qué local
+      ocurrió un hecho.
+    role: key
+    synonyms:
+    - ID de sucursal
+    - ID de local
+    - código de tienda
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    num_distinct: 12
+  - name: TDA_NOM
+    data_type: VARCHAR2
+    business_name: Nombre del local
+    description: Nombre comercial del local, por ejemplo 'Restaurante Polanco' o 'Tienda Cumbres'. Es la forma en
+      que el negocio nombra cada sucursal. Algunos nombres se repiten con sufijo (Polanco y Polanco II), lo que
+      indica sucursales distintas en la misma zona.
+    role: attribute
+    synonyms:
+    - sucursal
+    - tienda
+    - restaurante
+    - local
+    - nombre de la sucursal
+    values: {}
+    samples:
+    - Restaurante Polanco
+    - Tienda Cumbres
+    - Restaurante Polanco II
+    - Tienda Zapopan
+    - Tienda Puebla Centro
+    - Tienda Juriquilla
+    - Tienda Satélite
+    - Tienda Coyoacán
+    num_distinct: 12
+  - name: TDA_TP
+    data_type: VARCHAR2
+    business_name: Tipo de local
+    description: Indica si el local es restaurante o tienda de autoservicio. Según el comentario de la columna,
+      R = Restaurante y T = Tienda. Hay 6 de cada tipo.
+    role: code
+    synonyms:
+    - tipo de sucursal
+    - formato
+    - tipo de local
+    - giro
+    values:
+      R: Restaurante
+      T: Tienda de autoservicio
+    samples:
+    - R
+    - T
+    num_distinct: 2
+  - name: CD_NOM
+    data_type: VARCHAR2
+    business_name: Ciudad
+    description: Ciudad donde está ubicado el local. Ciudad de México concentra 4 locales; Puebla y Zapopan tienen
+      2 cada una.
+    role: attribute
+    synonyms:
+    - ciudad
+    - municipio
+    - plaza
+    - población
+    values: {}
+    samples:
+    - Ciudad de México
+    - Puebla
+    - Zapopan
+    - Monterrey
+    - Naucalpan
+    - Querétaro
+    - San Pedro Garza García
+    num_distinct: 7
+  - name: RGN_ID
+    data_type: NUMBER(38,0)
+    business_name: Región
+    description: Identificador de la región comercial a la que pertenece el local. Es clave foránea hacia DIM_RGN,
+      que contiene el nombre de cada región (no verificado en este documento). La región 1 agrupa 7 locales.
+    role: foreign_key
+    synonyms:
+    - ID de región
+    - zona
+    - territorio
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    num_distinct: 4
+  - name: FEC_APE
+    data_type: DATE
+    business_name: Fecha de apertura
+    description: Fecha en que el local inició operaciones. Las fechas van de junio de 2018 a marzo de 2024. Sirve
+      para calcular antigüedad del local y para filtrar ventas por madurez de la sucursal (supuesto).
+    role: date
+    synonyms:
+    - fecha de inauguración
+    - fecha de alta
+    - antigüedad
+    values: {}
+    samples:
+    - '2018-06-01'
+    - '2019-03-01'
+    - '2019-09-01'
+    - '2020-01-15'
+    - '2020-11-20'
+    - '2021-05-10'
+    - '2021-07-01'
+    - '2022-02-01'
+    num_distinct: 12
+  - name: M2_SUP
+    data_type: NUMBER(38,0)
+    business_name: Superficie (m²)
+    description: Superficie del local en metros cuadrados (supuesto por el nombre de la columna y el rango de valores,
+      180 a 980). Es un atributo descriptivo del local; si se suma entre locales no tiene sentido de negocio, pero
+      sí sirve para calcular ventas por metro cuadrado.
+    role: measure
+    synonyms:
+    - metros cuadrados
+    - tamaño
+    - área
+    - superficie
+    values: {}
+    samples:
+    - '180'
+    - '200'
+    - '210'
+    - '240'
+    - '260'
+    - '320'
+    - '640'
+    - '700'
+    num_distinct: 12
+  use_in_answers: true
+- name: FCT_DEV
+  role: fact
+  business_name: Devoluciones
+  description: 'Tabla de hechos que registra cada devolución o devolución de mercancía/venta en la cadena (restaurantes
+    y tiendas de autoservicio). Cada fila es un evento de devolución con fecha, hora, tienda, producto, empleado
+    que la atendió, cantidad, importe y motivo. (supuesto: ''DEV'' = devolución; ''TKT_ORIG'' = ticket original
+    de la venta que se devuelve.)'
+  grain: Una fila = una devolución de un producto (línea) registrada en una fecha y hora, en una tienda, atendida
+    por un empleado, referida opcionalmente a un ticket de venta original.
+  row_count: 18547
+  primary_key: []
+  columns:
+  - name: DEV_ID
+    data_type: NUMBER(38,0)
+    business_name: Identificador de devolución
+    description: Clave surrogate secuencial de cada registro de devolución. Es única por fila (18,547 distintos
+      sobre 18,547 filas). No está declarada como PK en la base.
+    role: key
+    synonyms:
+    - ID devolución
+    - folio interno de devolución
+    values: {}
+    samples: []
+    num_distinct: 18547
+  - name: FEC_ID
+    data_type: NUMBER(38,0)
+    business_name: Fecha de la devolución
+    description: Fecha del evento en formato entero AAAAMMDD. Relaciona con DIM_FEC. Rango 2025-01-01 a 2026-11-11.
+    role: date
+    synonyms:
+    - fecha
+    - día de la devolución
+    values: {}
+    samples: []
+    num_distinct: 680
+  - name: HR_DEV
+    data_type: NUMBER(38,0)
+    business_name: Hora de la devolución
+    description: Hora del día (0 a 22) en que se registró la devolución. Las horas pico son 13-20 h, en línea con
+      horario de comida y cena.
+    role: time
+    synonyms:
+    - hora
+    - hora del día
+    values: {}
+    samples:
+    - '13'
+    - '14'
+    - '18'
+    - '17'
+    - '15'
+    - '16'
+    - '20'
+    - '19'
+    num_distinct: 16
+  - name: TDA_ID
+    data_type: NUMBER(38,0)
+    business_name: Tienda
+    description: Identificador de la tienda o restaurante (unidad de negocio de la cadena) donde se hizo la devolución.
+      Relaciona con DIM_TDA. Hay 12 unidades; las de mayor volumen son 6, 9, 7, 8, 10 y 12.
+    role: foreign_key
+    synonyms:
+    - sucursal
+    - restaurante
+    - tienda
+    - unidad
+    values: {}
+    samples:
+    - '6'
+    - '9'
+    - '7'
+    - '8'
+    - '10'
+    - '12'
+    - '1'
+    - '4'
+    num_distinct: 12
+  - name: PRD_ID
+    data_type: NUMBER(38,0)
+    business_name: Producto
+    description: Identificador del producto devuelto. Relaciona con DIM_PROD. Hay 71 productos distintos en el rango
+      1001-1071.
+    role: foreign_key
+    synonyms:
+    - artículo
+    - producto
+    - SKU
+    - platillo
+    values: {}
+    samples: []
+    num_distinct: 71
+  - name: EMP_ID
+    data_type: NUMBER(38,0)
+    business_name: Empleado
+    description: Identificador del empleado que atendió/registró la devolución. Relaciona con DIM_EMP. Hay 43 empleados
+      distintos.
+    role: foreign_key
+    synonyms:
+    - cajero
+    - colaborador
+    - empleado
+    - vendedor
+    values: {}
+    samples: []
+    num_distinct: 43
+  - name: TKT_ORIG
+    data_type: VARCHAR2
+    business_name: Ticket original
+    description: 'Folio del ticket de venta original que se devuelve, con formato NN-NNNNNNN (probablemente caja-folio,
+      supuesto). Tiene 927 nulos: en esos casos la devolución no está ligada a un ticket de venta identificado.'
+    role: degenerate
+    synonyms:
+    - folio de venta
+    - ticket
+    - recibo original
+    - folio ticket
+    values: {}
+    samples:
+    - 04-0000033
+    - 06-0000107
+    - 08-0000024
+    - 09-0000065
+    - 09-0000080
+    - 09-0000083
+    - 09-0000103
+    - 12-0000006
+    num_distinct: 17412
+  - name: CANT
+    data_type: NUMBER(38,0)
+    business_name: Cantidad devuelta
+    description: Número de unidades devueltas del producto en esa línea. La mayoría de devoluciones son de 1 unidad
+      (13,252 de 18,547).
+    role: measure
+    synonyms:
+    - cantidad
+    - unidades
+    - piezas
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '8'
+    num_distinct: 7
+  - name: IMP_DEV
+    data_type: NUMBER(12,2)
+    business_name: Importe devuelto
+    description: Monto monetario devuelto en esa línea, en moneda local (pesos mexicanos, supuesto), con 2 decimales.
+      Rango de 0.96 a 1,301.73.
+    role: measure
+    synonyms:
+    - importe
+    - monto devuelto
+    - total devuelto
+    - reembolso
+    values: {}
+    samples: []
+    num_distinct: 9970
+  - name: MTV_CVE
+    data_type: VARCHAR2
+    business_name: Clave de motivo de devolución
+    description: Código del motivo por el que se devuelve el producto. Relaciona con DIM_MTV. Los 5 códigos observados
+      son CAD, DAN, INS, ERR y OTR. Las descripciones exactas están en DIM_MTV; los significados mostrados son supuestos
+      a partir del código.
+    role: code
+    synonyms:
+    - motivo
+    - razón de devolución
+    - causa
+    values:
+      CAD: Caducado (supuesto)
+      DAN: Dañado / en mal estado (supuesto)
+      INS: Insatisfecho con el producto (supuesto)
+      ERR: Error de captura o de cobro (supuesto)
+      OTR: Otro motivo (supuesto)
+    samples:
+    - CAD
+    - DAN
+    - INS
+    - ERR
+    - OTR
+    num_distinct: 5
+  use_in_answers: true
+- name: FCT_INV
+  role: fact
+  business_name: Inventario semanal por tienda y producto
+  description: Tabla de hechos que guarda la foto semanal de existencias (tomada cada domingo) de cada producto
+    en cada tienda. Permite saber cuánto producto había disponible en un momento dado y a qué costo unitario. La
+    cantidad de filas (26,190) coincide con 97 domingos × 6 tiendas × 45 productos, lo que indica una foto completa
+    sin huecos. No tiene llave primaria declarada, pero la combinación FEC_ID + TDA_ID + PRD_ID debería ser única
+    (verificar).
+  grain: Una fila = existencia de un producto (PRD_ID) en una tienda (TDA_ID) en una fecha de corte semanal (FEC_ID,
+    domingo).
+  row_count: 26190
+  primary_key: []
+  columns:
+  - name: FEC_ID
+    data_type: NUMBER(38,0)
+    business_name: Fecha de corte (semana)
+    description: 'Llave a la dimensión de fecha (DIM_FEC) en formato AAAAMMDD. Corresponde al domingo de la foto
+      semanal. Rango verificado: 2025-01-05 a 2026-11-08, 97 valores distintos. Se asume que todos son domingos
+      (supuesto, coherente con los extremos del rango).'
+    role: foreign_key
+    synonyms:
+    - fecha
+    - fecha de corte
+    - semana
+    - domingo de inventario
+    - fecha de foto
+    values:
+      formato: AAAAMMDD, por ejemplo 20250105 = 5 de enero de 2025
+    samples: []
+    num_distinct: 97
+  - name: TDA_ID
+    data_type: NUMBER(38,0)
+    business_name: Tienda
+    description: 'Llave a la dimensión de tiendas (DIM_TDA). Identifica el restaurante o tienda de autoservicio
+      donde está el inventario. Hay 6 tiendas distintas (IDs 6, 7, 8, 9, 10 y 12); falta el ID 11 en esta tabla
+      (supuesto: tienda cerrada, sin inventario reportado o no incluida en la foto). Cada tienda aparece exactamente
+      4,365 veces (97 semanas × 45 productos).'
+    role: foreign_key
+    synonyms:
+    - sucursal
+    - restaurante
+    - local
+    - unidad
+    - establecimiento
+    - tienda
+    values: {}
+    samples:
+    - '6'
+    - '7'
+    - '8'
+    - '9'
+    - '10'
+    - '12'
+    num_distinct: 6
+  - name: PRD_ID
+    data_type: NUMBER(38,0)
+    business_name: Producto
+    description: Llave a la dimensión de productos (DIM_PROD). Identifica el artículo cuyo inventario se mide. Hay
+      45 productos distintos con IDs entre 1027 y 1071. Cada producto aparece en las 97 semanas y las 6 tiendas.
+    role: foreign_key
+    synonyms:
+    - artículo
+    - SKU
+    - ítem
+    - producto
+    - mercancía
+    - insumo
+    values: {}
+    samples: []
+    num_distinct: 45
+  - name: EXIST_CANT
+    data_type: NUMBER(38,0)
+    business_name: Existencia (cantidad en inventario)
+    description: 'Cantidad de unidades del producto en la tienda en la fecha de corte. Es un valor de existencia
+      (saldo en un momento), no un flujo: sumar entre semanas no tiene sentido; para totales usar una sola fecha
+      o promedios. Sí se puede sumar entre tiendas o productos para la misma fecha. Rango observado: 17 a 71 unidades.
+      Unidad de medida no documentada (supuesto: piezas o unidades de venta).'
+    role: measure
+    synonyms:
+    - existencias
+    - stock
+    - cantidad en inventario
+    - unidades disponibles
+    - saldo
+    - inventario
+    values: {}
+    samples: []
+    num_distinct: 52
+  - name: CST_UNIT
+    data_type: NUMBER(12,2)
+    business_name: Costo unitario
+    description: 'Costo por unidad del producto en la fecha de corte, en moneda local (supuesto: pesos mexicanos
+      MXN). Rango observado: 11.59 a 79.49, con 45 valores distintos, lo que sugiere un costo por producto que puede
+      cambiar en el tiempo. No se debe sumar directamente; para valorar inventario multiplicar por EXIST_CANT y
+      luego sumar (supuesto: es costo promedio o estándar, no precio de venta).'
+    role: measure
+    synonyms:
+    - costo
+    - costo por unidad
+    - costo unitario
+    - costo promedio
+    - precio de costo
+    values: {}
+    samples: []
+    num_distinct: 45
+  use_in_answers: true
+- name: FCT_VTA
+  role: fact
+  business_name: Ventas detalle por ticket
+  description: Tabla de hechos de ventas a nivel de línea de ticket. Cada fila es un artículo vendido dentro de
+    un ticket de compra, con cantidad, importes y referencias a tienda, producto, empleado, cliente, fecha y hora.
+    El rango de fechas va de 2025-01-01 a 2026-11-11. Hay 12 tiendas (TDA_ID 1 a 12), 71 productos y 66 empleados.
+    El prefijo del número de ticket (01 a 12) parece corresponder al TDA_ID (supuesto). Por el contexto de negocio,
+    las tiendas pueden ser restaurantes o tiendas de autoservicio (supuesto).
+  grain: Una fila = una línea de un ticket de venta (un producto vendido en un ticket, con su cantidad e importes).
+    La clave natural probable es TKT_NUM + TKT_LIN (supuesto), ya que la tabla no declara PK.
+  row_count: 1908979
+  primary_key: []
+  columns:
+  - name: TKT_NUM
+    data_type: VARCHAR2
+    business_name: Número de ticket
+    description: Folio del ticket de venta. Tiene formato 'NN-NNNNNNN', donde el prefijo de 2 dígitos coincide con
+      el rango de TDA_ID y probablemente identifica la tienda (supuesto). Un mismo ticket agrupa varias líneas.
+    role: degenerate
+    synonyms:
+    - ticket
+    - folio
+    - folio de venta
+    - número de venta
+    - nota
+    values: {}
+    samples:
+    - 07-0026504
+    - 07-0026505
+    - 07-0026506
+    - 07-0026507
+    - 07-0026508
+    - 07-0026509
+    - 07-0026510
+    - 07-0026511
+    num_distinct: 764296
+  - name: TKT_LIN
+    data_type: NUMBER(38,0)
+    business_name: Número de línea del ticket
+    description: Consecutivo de la línea dentro del ticket (1 = primer artículo). Va de 1 a 12. Es el mismo número
+      de renglón que aparece en el ticket impreso (supuesto).
+    role: degenerate
+    synonyms:
+    - línea
+    - renglón
+    - partida
+    - posición en ticket
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    num_distinct: 12
+  - name: FEC_ID
+    data_type: NUMBER(38,0)
+    business_name: Fecha de venta (clave)
+    description: Clave de fecha con formato AAAAMMDD que enlaza con DIM_FEC. Rango 2025-01-01 a 2026-11-11.
+    role: foreign_key
+    synonyms:
+    - fecha
+    - día de venta
+    - fecha del ticket
+    values: {}
+    samples: []
+    num_distinct: 680
+  - name: HR_VTA
+    data_type: NUMBER(38,0)
+    business_name: Hora de venta
+    description: Hora del día en que se registró la venta, en formato 24 horas (8 a 23). Permite analizar patrones
+      de afluencia por horario.
+    role: time
+    synonyms:
+    - hora
+    - hora del ticket
+    - franja horaria
+    values: {}
+    samples:
+    - '19'
+    - '15'
+    - '14'
+    - '18'
+    - '21'
+    - '20'
+    - '13'
+    - '17'
+    num_distinct: 16
+  - name: TDA_ID
+    data_type: NUMBER(38,0)
+    business_name: Tienda (clave)
+    description: Identificador de la tienda o sucursal donde se realizó la venta. Enlaza con DIM_TDA. Hay 12 tiendas.
+    role: foreign_key
+    synonyms:
+    - tienda
+    - sucursal
+    - restaurante
+    - local
+    - punto de venta
+    - establecimiento
+    values: {}
+    samples:
+    - '6'
+    - '9'
+    - '7'
+    - '8'
+    - '10'
+    - '12'
+    - '1'
+    - '4'
+    num_distinct: 12
+  - name: PRD_ID
+    data_type: NUMBER(38,0)
+    business_name: Producto (clave)
+    description: Identificador del producto o artículo vendido. Enlaza con DIM_PROD. Hay 71 productos distintos.
+    role: foreign_key
+    synonyms:
+    - producto
+    - artículo
+    - SKU
+    - platillo
+    - mercancía
+    - ítem
+    values: {}
+    samples: []
+    num_distinct: 71
+  - name: EMP_ID
+    data_type: NUMBER(38,0)
+    business_name: Empleado que registró la venta (clave)
+    description: 'Identificador del empleado que atendió o cobró la venta. Enlaza con DIM_EMP. Hay 66 empleados
+      (supuesto: cajero o vendedor).'
+    role: foreign_key
+    synonyms:
+    - empleado
+    - cajero
+    - vendedor
+    - mesero
+    - atendió
+    - operador
+    values: {}
+    samples: []
+    num_distinct: 66
+  - name: CTE_ID
+    data_type: NUMBER(38,0)
+    business_name: Cliente (clave)
+    description: Identificador del cliente asociado a la venta. Enlaza con DIM_CTE. Va de 0 a 2000. El valor 0 probablemente
+      representa 'público general' o cliente no identificado (supuesto).
+    role: foreign_key
+    synonyms:
+    - cliente
+    - comprador
+    - consumidor
+    - público general
+    - socio
+    values: {}
+    samples: []
+    num_distinct: 2001
+  - name: CANT
+    data_type: NUMBER(38,0)
+    business_name: Cantidad vendida
+    description: Número de unidades del producto en la línea. Va de 1 a 9; la mayoría de las líneas son de 1 o 2
+      unidades. Es una medida aditiva.
+    role: measure
+    synonyms:
+    - cantidad
+    - unidades
+    - piezas
+    - cantidad vendida
+    - qty
+    values: {}
+    samples:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    num_distinct: 9
+  - name: IMP_BRT
+    data_type: NUMBER(12,2)
+    business_name: Importe bruto de la línea
+    description: Importe de la línea antes de descuentos. Rango de 18.33 a 2037.18. Por la relación con IMP_NTO,
+      se asume que está expresado sin IVA (supuesto).
+    role: measure
+    synonyms:
+    - importe bruto
+    - venta bruta
+    - precio sin descuento
+    - subtotal bruto
+    - monto bruto
+    values: {}
+    samples: []
+    num_distinct: 66450
+  - name: IMP_DSC
+    data_type: NUMBER(12,2)
+    business_name: Importe de descuento
+    description: Monto descontado a la línea (promociones, rebajas, cupones). Rango de 0.00 a 1099.68. Se asume
+      que IMP_NTO = IMP_BRT - IMP_DSC (supuesto).
+    role: measure
+    synonyms:
+    - descuento
+    - rebaja
+    - promoción
+    - monto descontado
+    - ahorro
+    values: {}
+    samples: []
+    num_distinct: 9512
+  - name: IMP_NTO
+    data_type: NUMBER(12,2)
+    business_name: Importe neto sin IVA
+    description: Importe de la línea después de descuentos y sin IVA. Es la base de venta para el análisis de ingresos.
+      Rango de 0.02 a 2037.18.
+    role: measure
+    synonyms:
+    - venta neta
+    - subtotal
+    - importe neto
+    - venta sin IVA
+    - ingreso neto
+    - base gravable
+    values: {}
+    samples: []
+    num_distinct: 70210
+  - name: IMP_IVA
+    data_type: NUMBER(12,2)
+    business_name: IVA de la línea
+    description: Impuesto al valor agregado de la línea. El máximo (325.95) equivale al 16% de 2037.18, por lo que
+      la tasa parece ser 16% (supuesto, tasa general en México). Rango de 0.00 a 325.95.
+    role: measure
+    synonyms:
+    - IVA
+    - impuesto
+    - impuesto al valor agregado
+    - IVA trasladado
+    values: {}
+    samples: []
+    num_distinct: 15639
+  use_in_answers: true
+relationships:
+- from_table: DIM_PROD
+  from_column: LIN_ID
+  to_table: DIM_LIN
+  to_column: LIN_ID
+  evidence:
+  - fk_declarada
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 1.0
+- from_table: DIM_EMP
+  from_column: TDA_ID
+  to_table: DIM_TDA
+  to_column: TDA_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: DIM_TDA
+  from_column: RGN_ID
+  to_table: DIM_RGN
+  to_column: RGN_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_DEV
+  from_column: FEC_ID
+  to_table: DIM_FEC
+  to_column: FEC_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_DEV
+  from_column: TDA_ID
+  to_table: DIM_TDA
+  to_column: TDA_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_DEV
+  from_column: PRD_ID
+  to_table: DIM_PROD
+  to_column: PRD_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_DEV
+  from_column: EMP_ID
+  to_table: DIM_EMP
+  to_column: EMP_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_DEV
+  from_column: MTV_CVE
+  to_table: DIM_MTV
+  to_column: MTV_CVE
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_INV
+  from_column: FEC_ID
+  to_table: DIM_FEC
+  to_column: FEC_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_INV
+  from_column: TDA_ID
+  to_table: DIM_TDA
+  to_column: TDA_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_INV
+  from_column: PRD_ID
+  to_table: DIM_PROD
+  to_column: PRD_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_VTA
+  from_column: FEC_ID
+  to_table: DIM_FEC
+  to_column: FEC_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_VTA
+  from_column: TDA_ID
+  to_table: DIM_TDA
+  to_column: TDA_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_VTA
+  from_column: PRD_ID
+  to_table: DIM_PROD
+  to_column: PRD_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_VTA
+  from_column: EMP_ID
+  to_table: DIM_EMP
+  to_column: EMP_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+- from_table: FCT_VTA
+  from_column: CTE_ID
+  to_table: DIM_CTE
+  to_column: CTE_ID
+  evidence:
+  - nombre_coincide
+  - verificado_datos(100.0%)
+  inclusion: 1.0
+  confidence: 0.95
+entities:
+- name: cliente
+  synonyms:
+  - comprador
+  - consumidor
+  - cuenta
+  - persona que compra
+  table: DIM_CTE
+  key_column: CTE_ID
+  label_columns:
+  - CTE_NOM
+  description: Dimensión de clientes
+- name: empleado
+  synonyms:
+  - cajero
+  - colaborador
+  - gerente
+  - mesero
+  - personal
+  - staff
+  - trabajador
+  table: DIM_EMP
+  key_column: EMP_ID
+  label_columns:
+  - EMP_NOM
+  description: Catálogo de empleados
+- name: línea de producto
+  synonyms:
+  - categoría
+  - departamento
+  - familia de producto
+  - línea
+  table: DIM_LIN
+  key_column: LIN_ID
+  label_columns:
+  - LIN_DESC
+  description: Catálogo de líneas de producto
+- name: motivo
+  synonyms:
+  - causa
+  - motivo de devolución
+  - razón
+  - razón de devolución
+  table: DIM_MTV
+  key_column: MTV_CVE
+  label_columns:
+  - MTV_DESC
+  description: Catálogo de motivos de devolución (supuesto)
+- name: producto
+  synonyms:
+  - SKU
+  - artículo
+  - item
+  - mercancía
+  - platillo
+  - ítem
+  table: DIM_PROD
+  key_column: PRD_ID
+  label_columns:
+  - PRD_DESC
+  description: Dimensión de productos
+- name: región
+  synonyms:
+  - región geográfica
+  - zona
+  - zona geográfica
+  table: DIM_RGN
+  key_column: RGN_ID
+  label_columns:
+  - RGN_DESC
+  description: Catálogo de regiones
+- name: tienda
+  synonyms:
+  - establecimiento
+  - local
+  - punto de venta
+  - restaurante
+  - sucursal
+  table: DIM_TDA
+  key_column: TDA_ID
+  label_columns:
+  - TDA_NOM
+  description: Tiendas y restaurantes (sucursales)
+metrics:
+- name: ventas_brutas
+  business_name: Ventas brutas
+  description: Suma del importe de las líneas antes de descuentos, sin IVA (supuesto).
+  table: FCT_VTA
+  expression: SUM(IMP_BRT)
+  format: money
+  additive: additive
+  synonyms:
+  - venta bruta
+  - subtotal bruto
+  - precio sin descuento
+- name: descuentos
+  business_name: Descuentos
+  description: Monto total descontado en promociones, rebajas y cupones.
+  table: FCT_VTA
+  expression: SUM(IMP_DSC)
+  format: money
+  additive: additive
+  synonyms:
+  - rebajas
+  - promociones
+  - ahorro
+- name: ventas_netas
+  business_name: Ventas netas (sin IVA)
+  description: 'Base de venta para el análisis de ingresos: importe después de descuentos y sin IVA.'
+  table: FCT_VTA
+  expression: SUM(IMP_NTO)
+  format: money
+  additive: additive
+  synonyms:
+  - venta neta
+  - ingreso neto
+  - base de venta
+  - subtotal
+- name: iva_trasladado
+  business_name: IVA trasladado
+  description: Impuesto al valor agregado de las ventas (tasa aparente de 16%, supuesto).
+  table: FCT_VTA
+  expression: SUM(IMP_IVA)
+  format: money
+  additive: additive
+  synonyms:
+  - IVA
+  - impuesto
+- name: unidades_vendidas
+  business_name: Unidades vendidas
+  description: Número total de unidades de producto vendidas.
+  table: FCT_VTA
+  expression: SUM(CANT)
+  format: number
+  additive: additive
+  synonyms:
+  - piezas vendidas
+  - cantidad vendida
+- name: tickets
+  business_name: Tickets de venta
+  description: Número de tickets distintos. Contar tickets, no filas, porque cada ticket tiene varias líneas.
+  table: FCT_VTA
+  expression: COUNT(DISTINCT TKT_NUM)
+  format: number
+  additive: non_additive
+  synonyms:
+  - folios
+  - número de ventas
+  - compras
+- name: clientes_compradores
+  business_name: Clientes compradores
+  description: Número de clientes distintos con al menos una venta en el periodo. El cliente genérico cuenta como
+    uno más (supuesto).
+  table: FCT_VTA
+  expression: COUNT(DISTINCT CTE_ID)
+  format: number
+  additive: non_additive
+  synonyms:
+  - compradores
+  - clientes activos
+- name: ticket_promedio
+  business_name: Ticket promedio
+  description: Venta neta promedio por ticket.
+  derived: '{ventas_netas}/NULLIF({tickets},0)'
+  format: money
+  additive: non_additive
+  synonyms:
+  - ticket medio
+  - gasto promedio por compra
+- name: porcentaje_descuento
+  business_name: Porcentaje de descuento
+  description: Proporción del ingreso bruto que se descontó.
+  derived: '{descuentos}/NULLIF({ventas_brutas},0)'
+  format: percent
+  additive: non_additive
+  synonyms:
+  - tasa de descuento
+  - '% descuento'
+- name: importe_devuelto
+  business_name: Importe devuelto
+  description: Monto monetario devuelto a los clientes. Se asume en pesos; si incluye IVA es una pregunta abierta.
+  table: FCT_DEV
+  expression: SUM(IMP_DEV)
+  format: money
+  additive: additive
+  synonyms:
+  - reembolsos
+  - monto devuelto
+  - devoluciones en pesos
+- name: unidades_devueltas
+  business_name: Unidades devueltas
+  description: Número de unidades devueltas de producto.
+  table: FCT_DEV
+  expression: SUM(CANT)
+  format: number
+  additive: additive
+  synonyms:
+  - piezas devueltas
+- name: devoluciones_registradas
+  business_name: Devoluciones registradas
+  description: Número de eventos de devolución distintos, medidos por DEV_ID.
+  table: FCT_DEV
+  expression: COUNT(DISTINCT DEV_ID)
+  format: number
+  additive: additive
+  synonyms:
+  - número de devoluciones
+  - casos de devolución
+- name: tasa_devolucion
+  business_name: Tasa de devolución
+  description: Importe devuelto como proporción de las ventas netas. Es una aproximación; ambos importes deben estar
+    en la misma base (con o sin IVA).
+  derived: '{importe_devuelto}/NULLIF({ventas_netas},0)'
+  format: percent
+  additive: non_additive
+  synonyms:
+  - índice de devoluciones
+  - '% devuelto'
+- name: existencias_unidades
+  business_name: Existencias en unidades
+  description: 'Unidades en inventario en la fecha de corte. Es un saldo: para una fecha usar la suma; entre fechas
+    no se suma.'
+  table: FCT_INV
+  expression: SUM(EXIST_CANT)
+  format: number
+  additive: semi_additive
+  synonyms:
+  - stock
+  - existencias
+  - inventario en unidades
+- name: valor_inventario
+  business_name: Valor del inventario a costo
+  description: Existencias valoradas a costo unitario en la fecha de corte. Sumar solo dentro de la misma fecha
+    de corte.
+  table: FCT_INV
+  expression: SUM(EXIST_CANT*CST_UNIT)
+  format: money
+  additive: semi_additive
+  synonyms:
+  - inventario valorizado
+  - valor de existencias
+- name: costo_unitario_promedio
+  business_name: Costo unitario promedio
+  description: Promedio del costo unitario en las filas seleccionadas. Es costo, no precio de venta.
+  table: FCT_INV
+  expression: AVG(CST_UNIT)
+  format: money
+  additive: non_additive
+  synonyms:
+  - costo promedio
+  - costo por unidad
+- name: precio_lista_promedio
+  business_name: Precio de lista promedio
+  description: Precio de referencia promedio del catálogo de productos. No es el precio cobrado en las ventas.
+  table: DIM_PROD
+  expression: AVG(PRC_LST)
+  format: money
+  additive: non_additive
+  synonyms:
+  - precio promedio
+  - tarifa promedio
+- name: superficie_promedio_m2
+  business_name: Superficie promedio por local (m²)
+  description: Metros cuadrados promedio de los locales seleccionados.
+  table: DIM_TDA
+  expression: AVG(M2_SUP)
+  format: number
+  additive: non_additive
+  synonyms:
+  - metros cuadrados promedio
+  - tamaño promedio de tienda
+time:
+  date_table: DIM_FEC
+  date_key: FEC_ID
+  date_column: FEC
+rules:
+- Venta neta = SUM(IMP_NTO) de FCT_VTA. Es la base de ingresos y ya descuenta promociones. Se asume IMP_NTO = IMP_BRT
+  - IMP_DSC (supuesto, verificable en datos).
+- Los importes de FCT_VTA son sin IVA. El IVA se reporta aparte en IMP_IVA con tasa aparente de 16% (supuesto).
+- Cada fila de FCT_VTA es una línea de ticket. Para contar ventas usar COUNT(DISTINCT TKT_NUM), nunca COUNT(*),
+  porque un ticket tiene varias líneas.
+- FCT_DEV es un flujo separado de FCT_VTA y no se resta de forma automática. Combinarlos solo a nivel de periodo
+  y confirmando que ambos importes estén en la misma base fiscal.
+- En FCT_DEV, TKT_ORIG nulo (927 registros) significa devolución sin ticket de venta identificado.
+- 'Las existencias de FCT_INV son saldos semi-aditivos: no se suman entre semanas. Para un periodo usar una fecha
+  de corte, un promedio o el último corte.'
+- Valor de inventario = SUM(EXIST_CANT*CST_UNIT) dentro de una misma fecha de corte. CST_UNIT es costo, no precio
+  de venta.
+- PRC_LST es precio de referencia del catálogo. El precio efectivo cobrado se aproxima con IMP_BRT / CANT de FCT_VTA
+  (supuesto).
+- 'En DIM_TDA, TDA_TP indica el tipo de local: R = Restaurante, T = Tienda de autoservicio (según comentario de
+  la columna). Hay 6 de cada tipo.'
+- El calendario DIM_FEC se une siempre por FEC_ID (formato AAAAMMDD). Las consultas por fecha deben usar esta dimensión
+  y no conversiones ad hoc.
+- 'Las horas no son comparables entre tablas sin ajuste: HR_VTA va de 8 a 23 y HR_DEV de 0 a 22.'
+- FCT_INV solo contiene 6 tiendas (IDs 6, 7, 8, 9, 10 y 12) y 45 productos (IDs 1027 a 1071), por lo que no representa
+  el catálogo completo.
+- Las fechas de corte de FCT_INV son domingos (supuesto, coherente con el rango observado).
+- Todo el catálogo de productos se mide en pieza (UOM_CVE = PZA).
+- El registro 'PUBLICO EN GENERAL' de DIM_CTE representa ventas sin cliente identificado (supuesto). Su CTE_ID no
+  está confirmado; el valor 0 es una hipótesis.
+- Los motivos de devolución (MTV_CVE) se decodifican desde DIM_MTV. Las etiquetas de significado de cada código
+  son supuestos a partir de su abreviatura.
+open_questions:
+- question: ¿Qué significa cada código de segmento de cliente (GEN, FRE, EMP)?
+  proposed_answer: 'Propuesta: GEN = público general, FRE = cliente frecuente, EMP = empresa o corporativo. Confirmar
+    con el negocio.'
+- question: ¿Qué CTE_ID corresponde al registro genérico 'PUBLICO EN GENERAL' y el valor 0 de FCT_VTA representa
+    lo mismo?
+  proposed_answer: 'Propuesta: el valor 0 es el público general. Verificar con una consulta directa sobre DIM_CTE.'
+- question: ¿Qué significa LIN_TP y qué línea tiene el código A?
+  proposed_answer: 'Propuesta: T = tienda, R = restaurante, A = ambos. Hay 6 candidatas para T y solo 5 posiciones,
+    así que una línea es ambigua. Confirmar con el equipo de datos.'
+- question: ¿Los códigos de puesto CAJ, MES y GTE corresponden a cajero, mesero y gerente?
+  proposed_answer: 'Propuesta: sí, por las abreviaturas. Confirmar con Recursos Humanos.'
+- question: ¿Por qué DIM_EMP tiene aproximadamente 78 empleados si FCT_VTA solo registra 66 y FCT_DEV 43?
+  proposed_answer: 'Propuesta: no todos los empleados registran ventas o devoluciones en el periodo, o hay empleados
+    inactivos en el catálogo. Confirmar si el catálogo incluye bajas.'
+- question: ¿Por qué FCT_INV excluye la tienda 11 y 39 de los 45 productos del catálogo?
+  proposed_answer: 'Propuesta: la tienda 11 está cerrada o no se incluye en la foto de inventario, y el subconjunto
+    de productos es intencional. Confirmar el alcance real del inventario.'
+- question: ¿El prefijo de TKT_NUM (01 a 12) corresponde siempre al TDA_ID?
+  proposed_answer: 'Propuesta: sí, por la coincidencia de rangos. Verificar con una consulta que compare prefijo
+    y TDA_ID en FCT_VTA.'
+- question: ¿La combinación TKT_NUM + TKT_LIN identifica de forma única cada línea de FCT_VTA?
+  proposed_answer: 'Propuesta: sí, es la clave natural probable. Verificar que no haya duplicados antes de usarla
+    para conteos.'
+- question: ¿La combinación FEC_ID + TDA_ID + PRD_ID es única en FCT_INV?
+  proposed_answer: 'Propuesta: sí, por la foto semanal completa (97 × 6 × 45 = 26,190 filas). Verificar.'
+- question: ¿IMP_DEV incluye IVA? ¿Las devoluciones se valoran al precio cobrado?
+  proposed_answer: 'Propuesta: no se sabe. Antes de calcular tasa_devolucion, confirmar la base de IMP_DEV frente
+    a IMP_NTO.'
+- question: ¿La semana de DIM_FEC (SEM_ANIO) sigue la norma ISO o una numeración propia?
+  proposed_answer: 'Propuesta: no se sabe; el rango de 1 a 52 sugiere numeración propia. Si se comparan reportes
+    con otros sistemas, definir la regla.'
+- question: ¿FES_FLG marca solo festivos oficiales de México o también días de promoción de la cadena?
+  proposed_answer: 'Propuesta: festivos oficiales (supuesto). Confirmar si existen días promocionales en otra tabla.'
+- question: ¿El calendario DIM_FEC se extenderá más allá de noviembre de 2026?
+  proposed_answer: 'Propuesta: sí, si el DW sigue operando. Confirmar la fecha de cierre del calendario actual.'
+- question: ¿Las regiones de DIM_RGN corresponden a las regiones internas de la empresa y qué RGN_ID corresponde
+    a cada nombre?
+  proposed_answer: 'Propuesta: son agrupaciones operativas internas. El mapeo RGN_ID a nombre no está verificado
+    en los datos; confirmarlo con una consulta directa.'
+- question: ¿La unidad de medida de EXIST_CANT es piezas o unidades de venta?
+  proposed_answer: 'Propuesta: piezas, por coherencia con UOM_CVE = PZA. Confirmar con el área de inventarios.'
+- question: ¿CST_UNIT es costo promedio, costo estándar o costo de última compra?
+  proposed_answer: 'Propuesta: costo promedio (supuesto). Confirmar el método de valuación, porque afecta el valor
+    del inventario.'
+- question: ¿Por qué la clave de DIM_PROD incluye 71 productos pero FCT_INV solo 45?
+  proposed_answer: 'Propuesta: el inventario solo rastrea productos de abarrotes o artículos de tienda. Confirmar
+    si los platillos de restaurante no tienen inventario controlado.'
+- question: ¿Qué moneda, tasa de IVA y base de importes aplican a todas las tablas?
+  proposed_answer: 'Propuesta: pesos mexicanos y IVA general de 16%. Confirmar la base de IMP_BRT (con o sin IVA).'

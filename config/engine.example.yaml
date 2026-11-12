@@ -1,0 +1,56 @@
+# Configuración del motor. Cambiar de cerebro o de base = cambiar este archivo, no el código.
+
+connection:
+  # --- Oracle real (producción) ---
+  # kind: oracle
+  # dsn: "mi-host:1521/DWPDB"
+  # user_env: DW_USER            # credenciales SIEMPRE por variables de entorno / .env
+  # password_env: DW_PASSWORD
+  # current_schema: DW           # opcional; si no, el esquema del usuario
+  # --- Backend de pruebas: DuckDB (recibe SQL Oracle y lo traduce) ---
+  kind: duckdb
+  path: data/test_dw.duckdb
+  include_tables: []             # vacío = todo lo que el usuario puede ver
+  exclude_patterns: ["TMP_*", "*_BKP"]
+  call_timeout_ms: 120000
+
+brain:
+  # --- Modelo local en tus H200 vía vLLM (API compatible OpenAI) ---
+  # provider: openai_compat
+  # base_url: http://gpu-server:8000/v1
+  # model: Qwen/Qwen3-235B-A22B-Instruct-FP8   # el que sirvas
+  # --- Ollama ---
+  # provider: openai_compat
+  # base_url: http://localhost:11434/v1
+  # model: qwen3:32b
+  # --- OpenAI ---
+  # provider: openai_compat
+  # model: gpt-5
+  # api_key_env: OPENAI_API_KEY
+  # --- Anthropic API ---
+  # provider: anthropic
+  # model: claude-sonnet-5-5
+  # api_key_env: ANTHROPIC_API_KEY
+  # --- Pruebas sin infraestructura: Claude Code headless (claude -p) ---
+  provider: claude_cli
+  model: haiku
+  timeout_s: 300
+  max_parallel: 4
+
+privacy:
+  send_sample_values: true       # false = al cerebro solo le llega metadata, nunca valores
+  max_sample_values: 8
+
+sql_mode: hybrid                 # compiled | free | hybrid
+max_rows: 5000
+detector_max_rows: 200000
+max_repairs: 3
+reference_date: auto             # 'auto' = hoy, o YYYY-MM-DD fijo para pruebas reproducibles
+language: es
+
+business_context: >
+  Cadena mexicana con restaurantes y tiendas de autoservicio.
+naming_hints: {}                 # ej. {TDA: tienda, VTA: venta} — opcional, el motor intenta deducirlas
+
+semantic_model_path: semantic/model.yaml
+output_dir: outputs

@@ -1,0 +1,56 @@
+# Set de evaluación: preguntas reales + verdad calculada directo en la base (truth_sql, SQL Oracle).
+# Cambia de cerebro en config/engine.yaml, corre `python -m dw_engine.cli eval` y compara el % de aciertos.
+#
+# expect.number: algún valor numérico en los resultados debe coincidir con truth_sql (tolerancia relativa)
+# expect.any_text: la respuesta debe mencionar al menos uno de estos textos (sin acentos/mayúsculas)
+# choose: qué opción elegir si el motor pregunta por una ambigüedad (texto contenido en la opción, o 'all')
+
+- id: 1
+  question: "¿Cuánto vendió el Restaurante Polanco el 3 de marzo de 2026?"
+  expect: {number: {truth_sql: "SELECT SUM(IMP_NTO) FROM FCT_VTA WHERE TDA_ID = 1 AND FEC_ID = 20260303", tol: 0.005}}
+
+- id: 2
+  question: "¿Cuánto vendió Polanco ayer?"
+  choose: ["Restaurante Polanco ["]
+  expect:
+    asked: true
+    number: {truth_sql: "SELECT SUM(IMP_NTO) FROM FCT_VTA WHERE TDA_ID = 1 AND FEC_ID = 20261111", tol: 0.005}
+
+- id: 3
+  question: "Top 5 productos por venta en la tienda satelite en octubre de este año"
+  expect:
+    number: {truth_sql: "SELECT MAX(s) FROM (SELECT SUM(IMP_NTO) s FROM FCT_VTA WHERE TDA_ID = 6 AND FEC_ID BETWEEN 20261001 AND 20261031 GROUP BY PRD_ID)", tol: 0.005}
+
+- id: 4
+  question: "¿Cuál es la tasa de devolución de cada tienda en lo que va de 2026?"
+  expect:
+    number: {truth_sql: "SELECT (SELECT SUM(IMP_DEV) FROM FCT_DEV WHERE TDA_ID = 6 AND FEC_ID >= 20260101) / (SELECT SUM(IMP_NTO) FROM FCT_VTA WHERE TDA_ID = 6 AND FEC_ID >= 20260101) FROM DUAL", tol: 0.01}
+
+- id: 5
+  question: "Venta neta mensual de restaurantes contra tiendas en 2026"
+  expect:
+    number: {truth_sql: "SELECT SUM(v.IMP_NTO) FROM FCT_VTA v JOIN DIM_TDA t ON t.TDA_ID = v.TDA_ID WHERE t.TDA_TP = 'R' AND v.FEC_ID BETWEEN 20260101 AND 20260131", tol: 0.005}
+
+- id: 6
+  question: "Busca hallazgos en las devoluciones de la Tienda Satélite este año"
+  expect: {any_text: ["Rodrigo"]}
+
+- id: 7
+  question: "¿Qué movimientos te parecen raros en las devoluciones de los últimos 6 meses?"
+  expect: {all_text_groups: [["Rodrigo"], ["Andares", "Lucia", "madrugada"], ["Zapopan", "Lacteos"]]}
+
+- id: 8
+  question: "Busca hallazgos en la línea lácteos de la tienda Zapopan"
+  expect: {any_text: ["caduc", "agosto", "cadena de frio"]}
+
+- id: 9
+  question: "¿Hay algo raro en los descuentos del restaurante Condesa?"
+  expect: {any_text: ["Javier"]}
+
+- id: 10
+  question: "¿Hubo días en que alguna tienda no vendió nada en 2026?"
+  expect: {any_text: ["Cumbres"]}
+
+- id: 11
+  question: "¿Qué devoluciones raras hubo en marzo de 2026 en las tiendas?"
+  expect: {any_text: ["Puebla", "platillo", "plato", "restaurante"]}

@@ -1,0 +1,15 @@
+langgraph>=1.2
+langchain-core>=1.8
+oracledb>=2.0
+duckdb>=1.1
+sqlglot>=30
+rapidfuzz>=3.9
+pandas>=2.2
+numpy>=1.26
+plotly>=6
+pyyaml>=6
+pydantic>=2.8
+openai>=1.50
+markdown>=3.6
+# opcional: anthropic   (provider: anthropic)
+streamlit>=1.40

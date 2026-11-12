@@ -1,0 +1,27 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secretos (las credenciales van en variables de entorno)
+.env
+.env.*
+
+# Generados en ejecución
+outputs/
+*.log
+
+# DW de prueba (40 MB, se regenera con: python scripts/make_test_dw.py)
+data/*.duckdb
+data/*.duckdb.wal
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code: preferencias locales
+.claude/settings.local.json
